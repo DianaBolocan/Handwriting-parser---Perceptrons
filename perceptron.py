@@ -64,23 +64,22 @@ def initialize_model(number_of_perceptrons: int, weights_size: int, biases_size:
     return weights, biases
 
 
-def train(number_of_iterations: int, learning_rate: float, weights: np.array, biases: np.array, train_data):
+def train(number_of_iterations: int, learning_rate: float, weights: np.array, biases: np.array, train_data, batch_size: int):
     delta = np.zeros((10, 784))
-    beta = np.zeros((10, 100))
+    beta = np.zeros((10, 1))
     while number_of_iterations:
-        for index in range(0, len(train_data[0]) - 99, 100):
-            # print(index+100)
-            data, labels = train_data[0][index:index + 100], train_data[1][index:index + 100]
-            # weights shape => (10, 784)
-            # data.T shape => (784, 100)
-            # labels = (100, 1)
-            # dot => (10, 100)
-            z = weights.dot(data.T) + biases
-            y = (z >= 0.0).astype(float)
-            delta += (labels - y).dot(data) * learning_rate  # (10, 784)
-            beta += (labels - y) * learning_rate  # (10, 100)
+        for batch in range(0, len(train_data[0]) - batch_size + 1, batch_size):
+            for index in range(batch, batch + 100):
+                data, label = train_data[0][index], train_data[1][index]
+                t = np.zeros((10, 1))
+                t[label] = 1
+                # weights shape => (10, 784)
+                z = weights.dot(data).reshape((10, 1)) + biases
+                y = (z >= 0.0).astype(float)
+                delta += (t - y) * data * learning_rate  # (10, 784)
+                beta += (t - y) * learning_rate  # (10, 1)
             weights += delta
-            biases += np.sum(beta, axis=1).reshape((10, 1))
+            biases += beta
         # shuffle
         indeces = np.arange(len(train_data[0]))
         np.random.shuffle(indeces)
@@ -92,11 +91,13 @@ def train(number_of_iterations: int, learning_rate: float, weights: np.array, bi
 def predict(test_set, weights: np.array, biases: np.array):
     results = np.zeros(test_set[1].shape)
     for index in range(len(test_set[0])):
-        values = np.sum(weights + test_set[0][index], axis=1).reshape((10, 1)) - biases
+        # print(weights.dot(test_set[0][index]).shape)
+        values = weights.dot(test_set[0][index]).reshape(10, 1) - biases
         results[index] = np.argmax(values, axis=0)
     values, counts = np.unique(results == test_set[1], return_counts=True)
     statistics = dict(zip(values, counts))
-    print("Accuracy: {}/{}".format(statistics[True], statistics[True]+statistics[False]))
+    print("Accuracy: {}/{}={}".format(statistics[True], statistics[True] + statistics[False],
+                                      statistics[True] / (statistics[True] + statistics[False])))
     return results
 
 
@@ -106,6 +107,8 @@ if __name__ == '__main__':
     f.close()
 
     weights, biases = initialize_model(10, 784, 10)
-    weights, biases = train(10, 0.5, weights, biases, train_set)
+    weights, biases = train(20, 0.05, weights, biases, train_set, 5000)
     predict(train_set, weights, biases)
     results = predict(test_set, weights, biases)
+    print(results)
+    print(test_set[1])
