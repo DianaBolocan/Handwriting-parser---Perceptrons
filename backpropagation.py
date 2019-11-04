@@ -12,7 +12,7 @@ class DNN:
             return data.dot(self.weights) + self.bias
 
         def sigmoid(self, results: np.array):
-            self.activated = 1 / (1 + np.exp(results))
+            self.activated = 1 / (1 + np.exp(-results))
             return self.activated
 
     class __HiddenLayer:
@@ -25,7 +25,7 @@ class DNN:
             return data.dot(self.weights) + self.bias
 
         def sigmoid(self, results: np.array):
-            self.activated = 1 / (1 + np.exp(results))
+            self.activated = 1 / (1 + np.exp(-results))
             return self.activated
 
         def softmax(self, results: np.array):
@@ -50,6 +50,7 @@ class DNN:
         self.hidden = self.__HiddenLayer(sizes[1], sizes[2])
         self.output = self.__OutputLayer()
         self.learning_rate = learning_rate
+        self.total_error = None
         self.errors = None
 
     def feed_forward(self, data: np.array):
@@ -60,13 +61,17 @@ class DNN:
         return self.output.results
 
     def cross_entropy(self, labels: np.array):
+        epsilon = 1e-15
         targets = np.zeros(self.output.results.shape)
         for index in range(len(labels)):
             targets[index][labels[index]] = 1
-        self.errors = self.output.results - targets
-        return self.errors
+        # print(np.log(self.output.results + epsilon) * targets)
+        self.errors = -np.log(self.output.results + epsilon) * targets
+        self.total_error = -np.sum(np.log(self.output.results + epsilon) * targets, axis=1)
+        return self.total_error, self.errors
 
     def backpropagation(self):
+
         return
 
     def train(self, data: np.array):
