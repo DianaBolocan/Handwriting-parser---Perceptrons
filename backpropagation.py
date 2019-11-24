@@ -5,11 +5,11 @@ class DNN:
     class __InputLayer:
         def __init__(self, input_size: int, output_size: int):
             self.weights = np.random.random((input_size, output_size))
-            self.bias = np.random.random(1)
+            self.biases = np.random.random(output_size)
             self.activated = None
 
         def total_net(self, data: np.array):
-            return data.dot(self.weights) + self.bias
+            return data.dot(self.weights) + self.biases
 
         def sigmoid(self, results: np.array):
             self.activated = 1 / (1 + np.exp(-results))
@@ -18,11 +18,11 @@ class DNN:
     class __HiddenLayer:
         def __init__(self, input_size: int, output_size: int):
             self.weights = np.random.random((input_size, output_size))
-            self.bias = np.random.random(1)
+            self.biases = np.random.random(output_size)
             self.activated = None
 
         def total_net(self, data: np.array):
-            return data.dot(self.weights) + self.bias
+            return data.dot(self.weights) + self.biases
 
         def sigmoid(self, results: np.array):
             self.activated = 1 / (1 + np.exp(-results))
@@ -38,10 +38,10 @@ class DNN:
 
         def compute_results(self, data: np.array):
             self.results = np.zeros(data.shape)
-            highest_values_indexes = data.argmax(axis=0)
+            highest_values_indexes = data.argmax(axis=1)
             for index in range(len(highest_values_indexes)):
                 self.results[index][highest_values_indexes[index]] = 1
-            return
+            return self.results
 
     def __init__(self, sizes: list, learning_rate: float):
         if len(sizes) != 3 or type(sizes[0]) != int or type(sizes[1]) != int or type(sizes[2]) != int:
@@ -66,12 +66,30 @@ class DNN:
         for index in range(len(labels)):
             targets[index][labels[index]] = 1
         # print(np.log(self.output.results + epsilon) * targets)
-        self.errors = -np.log(self.output.results + epsilon) * targets
-        self.total_error = -np.sum(np.log(self.output.results + epsilon) * targets, axis=1)
+        self.errors = np.log(self.output.results + epsilon) * targets
+        self.total_error = -np.sum(np.log(self.output.results + epsilon) * targets, axis=1)/self.errors.shape[-1]
         return self.total_error, self.errors
 
-    def backpropagation(self):
-
+    def backpropagation(self, labels: np.array):
+        # self.cross_entropy(labels)
+        targets = np.zeros(self.output.results.shape)
+        for index in range(len(labels)):
+            targets[index][labels[index]] = 1
+        # update weights and biases from output layer
+        lambda_output = self.output.results - targets
+        for line in lambda_output * self.hidden.activated:
+            self.hidden.weights -= self.learning_rate * line
+        # TODO: check for biases weights
+        for line in lambda_output:
+            self.hidden.biases -= line
+        # update from hidden layer
+        temp = np.zeros(self.hidden.weights.shape)
+        for line in lambda_output:
+            temp += self.hidden.weights * line
+        print(temp.shape)
+        print((self.input.activated*(1 - self.input.activated)).shape)
+        # for line in self.input.activated*(1 - self.input.activated)*temp:
+        #     print(line)
         return
 
     def train(self, data: np.array):
@@ -132,5 +150,9 @@ if __name__ == '__main__':
     # print(test_set[1])
 
     dnn = DNN([784, 100, 10], 0.05)
-    print(dnn.feed_forward(train_set[0][:10]))
-    print(dnn.cross_entropy(train_set[1][:10]))
+    dnn.feed_forward(train_set[0][:20])
+    total, all = dnn.cross_entropy(train_set[1][:20])
+    # print(total)
+    # print(all)
+    dnn.backpropagation(train_set[1][:20])
+
