@@ -43,15 +43,15 @@ class DNN:
                 self.results[index][highest_values_indexes[index]] = 1
             return self.results
 
-    def __init__(self, sizes: list, learning_rate: float):
+    def __init__(self, sizes: list, learning_rate: float, batch_size: int, iterations: int):
         if len(sizes) != 3 or type(sizes[0]) != int or type(sizes[1]) != int or type(sizes[2]) != int:
             raise Exception("Expecting 3 int values got {} values: {}.".format(len(sizes), sizes))
         self.input = self.__InputLayer(sizes[0], sizes[1])
         self.hidden = self.__HiddenLayer(sizes[1], sizes[2])
         self.output = self.__OutputLayer()
         self.learning_rate = learning_rate
-        self.total_error = None
-        self.errors = None
+        self.batch_size = batch_size
+        self.iterations = iterations
 
     def feed_forward(self, data: np.array):
         self.input.sigmoid(self.input.total_net(data))
@@ -60,18 +60,7 @@ class DNN:
         self.output.compute_results(self.hidden.activated)
         return self.output.results
 
-    def cross_entropy(self, labels: np.array):
-        epsilon = 1e-15
-        targets = np.zeros(self.output.results.shape)
-        for index in range(len(labels)):
-            targets[index][labels[index]] = 1
-        # print(np.log(self.output.results + epsilon) * targets)
-        self.errors = np.log(self.output.results + epsilon) * targets
-        self.total_error = -np.sum(np.log(self.output.results + epsilon) * targets, axis=1)/self.errors.shape[-1]
-        return self.total_error, self.errors
-
     def backpropagation(self, labels: np.array):
-        # self.cross_entropy(labels)
         targets = np.zeros(self.output.results.shape)
         for index in range(len(labels)):
             targets[index][labels[index]] = 1
@@ -83,58 +72,30 @@ class DNN:
         for line in lambda_output:
             self.hidden.biases -= line
         # update from hidden layer
-        temp = np.zeros(self.hidden.weights.shape)
-        for line in lambda_output:
-            temp += self.hidden.weights * line
-        print(temp.shape)
-        print((self.input.activated*(1 - self.input.activated)).shape)
-        # for line in self.input.activated*(1 - self.input.activated)*temp:
-        #     print(line)
+        dot = self.hidden.weights.dot(lambda_output.T).T
+        lambda_hidden = self.input.activated * (1 - self.input.activated) * dot
+        for line in lambda_hidden * self.input.activated:
+            self.input.weights -= self.learning_rate * line
+        for line in lambda_hidden:
+            self.input.biases -= line
         return
 
     def train(self, data: np.array):
+        print(len(data[0]))
+        while self.iterations:
+            for batch in range(0, len(data[0]) - self.batch_size + 1, self.batch_size):
+                data, label = data[0][batch: batch + self.batch_size], data[1][batch:batch + self.batch_size]
+                self.feed_forward(data)
+                self.backpropagation(label)
+            # shuffle
+            indeces = np.arange(len(data[0]))
+            np.random.shuffle(indeces)
+            data = (data[0][indeces], data[1][indeces])
+            self.iterations -= 1
         return
 
     def predict(self, data: np.array):
         return
-
-
-# def train(number_of_iterations: int, learning_rate: float, weights: np.array, biases: np.array, train_data,
-#           batch_size: int):
-#     delta = np.zeros((10, 784))
-#     beta = np.zeros((10, 1))
-#     while number_of_iterations:
-#         for batch in range(0, len(train_data[0]) - batch_size + 1, batch_size):
-#             for index in range(batch, batch + 100):
-#                 data, label = train_data[0][index], train_data[1][index]
-#                 t = np.zeros((10, 1))
-#                 t[label] = 1
-#                 # weights shape => (10, 784)
-#                 z = weights.dot(data).reshape((10, 1)) + biases
-#                 y = (z >= 0.0).astype(float)
-#                 delta += (t - y) * data * learning_rate  # (10, 784)
-#                 beta += (t - y) * learning_rate  # (10, 1)
-#             weights += delta
-#             biases += beta
-#         # shuffle
-#         indeces = np.arange(len(train_data[0]))
-#         np.random.shuffle(indeces)
-#         train_data = (train_data[0][indeces], train_data[1][indeces])
-#         number_of_iterations -= 1
-#     return weights, biases
-#
-#
-# def predict(test_set, weights: np.array, biases: np.array):
-#     results = np.zeros(test_set[1].shape)
-#     for index in range(len(test_set[0])):
-#         # print(weights.dot(test_set[0][index]).shape)
-#         values = weights.dot(test_set[0][index]).reshape(10, 1) - biases
-#         results[index] = np.argmax(values, axis=0)
-#     values, counts = np.unique(results == test_set[1], return_counts=True)
-#     statistics = dict(zip(values, counts))
-#     print("Accuracy: {}/{}={}".format(statistics[True], statistics[True] + statistics[False],
-#                                       statistics[True] / (statistics[True] + statistics[False])))
-#     return results
 
 
 if __name__ == '__main__':
@@ -142,17 +103,5 @@ if __name__ == '__main__':
     train_set, valid_set, test_set = cPickle.load(f, encoding='latin1')
     f.close()
 
-    # weights, biases = initialize_model(10, 784, 10)
-    # weights, biases = train(20, 0.05, weights, biases, train_set, 5000)
-    # predict(train_set, weights, biases)
-    # results = predict(test_set, weights, biases)
-    # print(results)
-    # print(test_set[1])
-
-    dnn = DNN([784, 100, 10], 0.05)
-    dnn.feed_forward(train_set[0][:20])
-    total, all = dnn.cross_entropy(train_set[1][:20])
-    # print(total)
-    # print(all)
-    dnn.backpropagation(train_set[1][:20])
-
+    dnn = DNN([784, 100, 10], 0.05, 20, 10)
+    dnn.train(train_set)
