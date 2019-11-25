@@ -1,4 +1,5 @@
 import numpy as np, _pickle as cPickle, gzip
+from tqdm import tqdm
 
 
 class DNN:
@@ -81,12 +82,13 @@ class DNN:
         return
 
     def train(self, data: np.array):
-        print(len(data[0]))
         while self.iterations:
-            for batch in range(0, len(data[0]) - self.batch_size + 1, self.batch_size):
-                data, label = data[0][batch: batch + self.batch_size], data[1][batch:batch + self.batch_size]
-                self.feed_forward(data)
+            count_batch = 0
+            for batch in tqdm(range(0, len(data[0]) - self.batch_size + 1, self.batch_size)):
+                input_data, label = data[0][batch: batch + self.batch_size], data[1][batch:batch + self.batch_size]
+                self.feed_forward(input_data)
                 self.backpropagation(label)
+                count_batch += 1
             # shuffle
             indeces = np.arange(len(data[0]))
             np.random.shuffle(indeces)
@@ -95,7 +97,12 @@ class DNN:
         return
 
     def predict(self, data: np.array):
-        return
+        results = np.argmax(self.feed_forward(data[0]), axis=1)
+        values, counts = np.unique(results == data[1], return_counts=True)
+        statistics = dict(zip(values, counts))
+        print("Accuracy: {}/{}={}".format(statistics[True], statistics[True] + statistics[False],
+                                          statistics[True] / (statistics[True] + statistics[False])))
+        return results
 
 
 if __name__ == '__main__':
@@ -103,5 +110,8 @@ if __name__ == '__main__':
     train_set, valid_set, test_set = cPickle.load(f, encoding='latin1')
     f.close()
 
-    dnn = DNN([784, 100, 10], 0.05, 20, 10)
+    dnn = DNN([784, 100, 10], 0.05, 5000, 10)
     dnn.train(train_set)
+    dnn.predict(train_set)
+    dnn.predict(valid_set)
+    dnn.predict(test_set)
